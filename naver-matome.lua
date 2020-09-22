@@ -40,11 +40,12 @@ load_json_file = function(file)
   end
 end
 
-discover_item = function(item, tries)
+discover_item = function(type_, name, tries)
   if tries == nil then
     tries = 0
   end
-  item = urlparse.unescape(item)
+  name = urlparse.escape(urlparse.unescape(name)) -- normalize
+  item = type_ .. ':' .. name
   if discovered[item] then
     return true
   end
@@ -69,12 +70,13 @@ discover_item = function(item, tries)
     if tries == 10 then
       io.stdout:write("Maximum retries reached for sending discovered item.\n")
       io.stdout:flush()
-      abortgrab = true
-      return false
+    else
+      os.execute("sleep " .. math.pow(2, tries))
+      return discover_item(type_, name, tries + 1)
     end
-    os.execute("sleep " .. math.pow(2, tries))
-    return discover_item(item, tries + 1)
   end
+  abortgrab = true
+  return false
 end
 
 read_file = function(file)
@@ -113,7 +115,7 @@ allowed = function(url, parenturl)
 
   local match = string.match(url, "^https?://matome%.naver%.jp/topic/([^/%?&]+)$")
   if match then
-    discover_item("topic:" .. match)
+    discover_item("topic", match)
   end
 
   match = string.match(url, "^https?://matome%.naver%.jp/mymatome/([^/%?&]+)$")
@@ -121,7 +123,7 @@ allowed = function(url, parenturl)
     match = string.match(url, "^https?://matome%.naver%.jp/profile/([^/%?&]+)$")
   end
   if match then
-    discover_item("profile:" .. match)
+    discover_item("profile", match)
   end
 
   if (
