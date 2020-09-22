@@ -20,7 +20,7 @@ local abortgrab = false
 local done_tags = false
 
 local discovered = {}
-discovered["profile:" .. item_value] = true
+discovered[item_type .. ":" .. item_value] = true
 
 local post_ids = {}
 
