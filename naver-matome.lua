@@ -235,9 +235,31 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     end
   end
 
+  local function apitags(post_data)
+    table.insert(urls, {
+      url="https://matome.naver.jp/api/user/tag/list",
+      post_data=post_data,
+      headers={
+        ["X-Requested-With"]="XMLHttpRequest",
+        ["Accept"]="application/json, text/javascript, */*; q=0.01",
+        ["Content-Type"]="application/json;charset=utf-8",
+        ["Content-Length"]=tostring(string.len(post_data))
+      }
+    })
+  end
+
   if allowed(url, nil) and status_code == 200
     and not string.match(url, "^https?://[^/]*img%.naver%.jp/") then
     html = read_file(file)
+    if url == "https://matome.naver.jp/api/user/tag/list" then
+      local data = load_json_file(html)
+      if not data or not data["result"] then
+        io.stdout:write("Could not extract API tags list.\n")
+        io.stdout:flush()
+        abortgrab = true
+      end
+      html = data["result"]
+    end
     if string.match(html, "go[pP]age%s*%([0-9]+%)") then
       local match = string.match(html, '<form%s+name="form"%s+action="[^"]+"%s+method="get">(.-)</form>')
       local params = ""
@@ -274,37 +296,17 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
           abortgrab = true
         end
         for page=1,data["totalPage"] do
-          post_data = '{' ..
+          apitags('{' ..
             '"page":' .. tostring(page) ..
             ',"fetch":' .. data["fetch"] ..
             ',"userHash":"' .. data["userHash"] .. '"' ..
-          '}'
-          table.insert(urls, {
-            url="https://matome.naver.jp/api/user/tag/list",
-            post_data=post_data,
-            headers={
-              ["X-Requested-With"]="XMLHttpRequest",
-              ["Accept"]="application/json, text/javascript, */*; q=0.01",
-              ["Content-Type"]="application/json;charset=utf-8",
-              ["Content-Length"]=tostring(string.len(post_data))
-            }
-          })
+          '}')
         end
-        data = '{' ..
+        apitags('{' ..
           '"page":1' ..
           ',"fetch":' .. data["total"] ..
           ',"userHash":"' .. data["userHash"] .. '"' ..
-        '}'
-        table.insert(urls, {
-          url="https://matome.naver.jp/api/user/tag/list",
-          post_data=post_data,
-          headers={
-            ["X-Requested-With"]="XMLHttpRequest",
-            ["Accept"]="application/json, text/javascript, */*; q=0.01",
-            ["Content-Type"]="application/json;charset=utf-8",
-            ["Content-Length"]=tostring(string.len(post_data))
-          }
-        })
+        '}')
         done_tags = true
       end
     end
@@ -372,13 +374,13 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     local maxtries = 12
     if not allowed(url["url"], nil)
       or string.match(url["url"], "^https?://rr%.img%.naver%.jp/mig%?.*src=") then
-      maxtries = 3
+      maxtries = 1
     end
     if tries >= maxtries then
       io.stdout:write("I give up...\n")
       io.stdout:flush()
       tries = 0
-      if maxtries == 3 then
+      if maxtries == 1 then
         return wget.actions.EXIT
       else
         return wget.actions.ABORT
